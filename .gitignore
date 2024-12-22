@@ -4,6 +4,11 @@ veto_image_assets
 /veto_image_assets/**
 result.png
 
+# Match configs
+PUG_*.json
+1*.json
+veto_image.png
+
 # Config Files
 config.json
 

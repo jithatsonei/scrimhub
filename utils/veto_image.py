@@ -139,7 +139,9 @@ class VetoImage:
                 font = ImageFont.truetype(self.font_fp, int(image_width / 15))
             draw = ImageDraw.Draw(darkened_image)
 
-            text_width, text_height = draw.textsize(image_root_name, font=font)
+            bbox = draw.textbbox((0, 0), image_root_name, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
             draw.text(((image_width - text_width) / 2, (image_height - text_height) / 2),
                       text=image_root_name, font=font, align='center')
 
@@ -211,8 +213,9 @@ class VetoImage:
 
                 draw = ImageDraw.Draw(canvas)
                 index_string = str(index + 1)
-                text_width, text_height = draw.textsize(
-                    index_string, font=font)
+                bbox = draw.textbbox((0, 0), index_string, font=font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
                 draw.text((text_width + x, (first_image_height - text_height) / 2 + y),
                           text=index_string, font=font, align='center')
 

@@ -2,7 +2,8 @@ import checks
 import discord
 import logging
 import traceback
-import valve.rcon
+from rcon.source import rcon
+
 
 from bot import Discord_10man
 from databases import Database
@@ -237,8 +238,7 @@ class Setup(commands.Cog):
     async def RCON_message(self, ctx: commands.Context, *, message: str):
         self.logger.debug(f'{ctx.author}: {ctx.prefix}{ctx.invoked_with} {ctx.args[2:]}')
         for server in self.bot.servers:
-            test_message = valve.rcon.execute((server.server_address, server.server_port), server.RCON_password,
-                                              f'say {message}')
+            test_message = await rcon('say', message, server.server_address, server.server_port, server.RCON_password)
             print(f'Server #{server.id} | {test_message}')
             self.logger.debug(f'Server #{server.id} | {test_message}')
 
@@ -259,8 +259,7 @@ class Setup(commands.Cog):
     async def RCON_unban(self, ctx: commands.Context):
         self.logger.debug(f'{ctx.author}: {ctx.prefix}{ctx.invoked_with} {ctx.args[2:]}')
         for server in self.bot.servers:
-            unban = valve.rcon.execute((server.server_address, server.server_port), server.RCON_password,
-                                       'removeallids')
+            unban = await rcon('removeallids', server.server_address, server.server_port, server.RCON_password)
             print(f'Server #{server.id} | {unban}')
             self.logger.debug(f'Server #{server.id} | {unban}')
 
@@ -278,8 +277,8 @@ class Setup(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def force_end(self, ctx: commands.Context, server_id: int = 0):
         self.logger.debug(f'{ctx.author}: {ctx.prefix}{ctx.invoked_with} {ctx.args[2:]}')
-        valve.rcon.execute((self.bot.servers[server_id].server_address, self.bot.servers[server_id].server_port),
-                           self.bot.servers[server_id].RCON_password, 'get5_endmatch')
+        response = await rcon('matchzy_endmatch', self.bot.servers[server_id].server_address, self.bot.servers[server_id].server_port, self.bot.servers[server_id].RCON_password)
+        self.logger.debug(f'Server #{server_id} | {response}')
 
     @force_end.error
     async def force_end_error(self, ctx: commands.Context, error: Exception):
@@ -289,5 +288,5 @@ class Setup(commands.Cog):
             self.logger.exception(f'{ctx.command} caused an exception')
 
 
-def setup(client):
-    client.add_cog(Setup(client))
+async def setup(client):
+    await client.add_cog(Setup(client))

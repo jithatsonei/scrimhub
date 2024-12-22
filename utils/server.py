@@ -22,7 +22,7 @@ class WebServer:
         self.logger = logging.getLogger(f'10man.{__name__}')
 
         self.bot: Discord_10man = bot
-        self.IP: str = socket.gethostbyname(socket.gethostname())
+        self.IP: str = "172.21.73.129"
         self.port: int = self.bot.bot_port
         self.site: web.TCPSite = None
         self.csgo_servers: List[CSGOServer] = []
@@ -124,9 +124,6 @@ class WebServer:
                     elif get5_event['event'] == 'series_cancel':
                         self.logger.info(f'ServerID={server.id} | Admin Cancelled Match')
                         await server.score_message.edit(content='Game Cancelled by Admin')
-                        # Temporary fix, Get5 breaks on a series cancel unless map changes
-                        valve.rcon.execute((server.server_address, server.server_port), server.RCON_password,
-                                           'sm_map de_mirage')
 
                     score_embed: discord.Embed = server.score_message.embeds[0]
                     score_embed.set_footer(text='🟥 Ended')

@@ -99,5 +99,5 @@ class Utils(commands.Cog):
         self.logger.debug(f'{ctx.author} got bot about info.')
 
 
-def setup(client):
-    client.add_cog(Utils(client))
+async def setup(client):
+    await client.add_cog(Utils(client))

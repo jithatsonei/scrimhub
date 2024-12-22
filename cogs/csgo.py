@@ -2,13 +2,14 @@ import aiohttp
 import asyncio
 import checks
 import datetime
+import time
 import discord
 import json
 import os
 import socket
 import traceback
-import valve.rcon
-import valve.source.a2s
+from rcon.source import rcon
+from a2s import info
 
 from bot import Discord_10man
 from collections import Counter
@@ -211,7 +212,7 @@ class CSGO(commands.Cog):
                     message = await ctx.fetch_message(message.id)
 
                     for reaction in message.reactions:
-                        users = await reaction.users().flatten()
+                        users = [user async for user in reaction.users()]
                         if current_captain in users and selected_players < player_veto[player_veto_count] and not (
                                 reaction.emoji in emojis_selected):
                             index = emojis.index(reaction.emoji)
@@ -319,11 +320,11 @@ class CSGO(commands.Cog):
         team2_flag_request = ''
 
         for player in team1_steamIDs:
-            team1_flag_request += SteamID(player).__str__() + ','
+            team1_flag_request += str(SteamID(player).as_64) + ','
         team1_flag_request = team1_flag_request[:-1]
 
         for player in team2_steamIDs:
-            team2_flag_request += SteamID(player).__str__() + ','
+            team2_flag_request += str(SteamID(player).as_64) + ','
         team2_flag_request = team2_flag_request[:-1]
 
         self.logger.info('Making request to the Steam API to get player flags')
@@ -356,7 +357,8 @@ class CSGO(commands.Cog):
         team1_name = f'team_{unidecode(team1_captain.display_name)}'
         team2_name = f'team_{unidecode(team2_captain.display_name)}'
 
-        match_id = f'PUG_{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}'
+        
+        match_id = time.time().__int__()
 
         match_config = {
             'matchid': match_id,
@@ -383,8 +385,8 @@ class CSGO(commands.Cog):
                 'players': team2_steamIDs
             },
             'cvars': {
-                'get5_event_api_url': f'http://{bot_ip}:{self.bot.web_server.port}/',
-                'get5_print_damage': '1',
+                'matchzy_remote_log_url': f'http://{bot_ip}:{self.bot.web_server.port}/',
+                'matchzy_enable_damage_report': '1',
             }
         }
 
@@ -395,16 +397,10 @@ class CSGO(commands.Cog):
 
         await ctx.send('If you are coaching, once you join the server, type .coach')
         loading_map_message = await ctx.send('Server is being configured')
-        await asyncio.sleep(0.3)
-        get5_trigger = valve.rcon.execute((csgo_server.server_address, csgo_server.server_port),
-                                          csgo_server.RCON_password,
-                                          'exec triggers/get5')
-        self.logger.debug(f'Executing get5_trigger (something for Yannicks Server) \n {get5_trigger}')
         await asyncio.sleep(10)
         await loading_map_message.delete()
-        load_match = valve.rcon.execute((csgo_server.server_address, csgo_server.server_port),
-                                        csgo_server.RCON_password,
-                                        f'get5_loadmatch_url "{bot_ip}:{self.bot.web_server.port}/{match_id}"')
+        load_match = await rcon(f'matchzy_loadmatch_url "http://{bot_ip}:{self.bot.web_server.port}/{match_id}"',
+                                host=csgo_server.server_address, port=csgo_server.server_port, passwd=csgo_server.RCON_password)
         self.logger.debug(f'Load Match via URL\n {load_match}')
         await asyncio.sleep(5)
         connect_embed = await self.connect_embed(csgo_server)
@@ -521,12 +517,9 @@ class CSGO(commands.Cog):
             '''
             embed = discord.Embed(title='__Map veto__',
                                   color=discord.Colour(0x650309))
-            response = await session.get(f'{base_url}/map-veto')
-            path = (await response.json())['path']
-            url = base_url + path
-            embed.set_image(url=url)
+            embed.set_image(url="attachment://veto.png")
             embed.set_footer(text=f'It is now {current_team_captain}\'s turn to veto | You have 60 seconds',
-                             icon_url=current_team_captain.avatar_url)
+                             icon_url=current_team_captain.display_avatar.url)
             return embed
 
         async def add_reactions(message, num_maps):
@@ -576,7 +569,16 @@ class CSGO(commands.Cog):
         self.veto_image.construct_veto_image(map_list, veto_image_fp,
                                              is_vetoed=is_vetoed, spacing=25)
         embed = await get_embed(current_team_captain)
-        message = await ctx.send(embed=embed)
+        response = await session.get(f'{base_url}/map-veto')
+        path = (await response.json())['path']
+        url = base_url.rstrip('/') + '/' + path.lstrip('/')
+        self.logger.debug(f'Veto image URL: {url}')
+        image_response = await session.get(url)
+        image_data = await image_response.read()
+        with open('veto_image.png', 'wb') as f:
+            f.write(image_data)
+        file = discord.File('veto_image.png', 'veto.png')
+        message = await ctx.send(file=file, embed=embed)
 
         await add_reactions(message, len(map_list))
 
@@ -717,11 +719,7 @@ class CSGO(commands.Cog):
         self.logger.exception(f'{ctx.command} caused an exception')
 
     async def connect_embed(self, csgo_server: CSGOServer) -> discord.Embed:
-        with valve.source.a2s.ServerQuerier((csgo_server.server_address, csgo_server.server_port),
-                                            timeout=20) as server:
-            info = server.info()
-
-        embed = discord.Embed(title=info['server_name'], color=0xf4c14e)
+        embed = discord.Embed(title="PUG Server", color=0xf4c14e)
         embed.set_thumbnail(
             url="https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/730/69f7ebe2735c366c65c0b33dae00e12dc40edbe4.jpg")
         embed.add_field(name='Quick Connect',
@@ -730,13 +728,6 @@ class CSGO(commands.Cog):
         embed.add_field(name='Console Connect',
                         value=f'connect {csgo_server.server_address}:{csgo_server.server_port}; password {csgo_server.server_password}',
                         inline=False)
-        embed.add_field(name='Players', value=f'{info["player_count"]}/{info["max_players"]}', inline=True)
-        embed.add_field(name='Map', value=info['map'], inline=True)
-        gotv = csgo_server.get_gotv()
-        if gotv is not None:
-            embed.add_field(name='GOTV',
-                            value=f'connect {csgo_server.server_address}:{gotv}',
-                            inline=False)
         return embed
 
     @commands.command(aliases=['maps'], help='Resets the map pool to be whatever maps are specified'
@@ -803,6 +794,6 @@ class CSGO(commands.Cog):
         self.logger.exception(f'{ctx.command} caused an exception')
 
 
-def setup(client):
+async def setup(client):
     veto_image_generator = VetoImage('images/map_images', 'images/x.png', 'png')
-    client.add_cog(CSGO(client, veto_image_generator))
+    await client.add_cog(CSGO(client, veto_image_generator))

@@ -1,6 +1,7 @@
 import discord
 import logging
-import valve.rcon
+from rcon.source import rcon
+
 
 from discord.ext.commands import Context
 from typing import List
@@ -58,7 +59,7 @@ class CSGOServer:
 
     def get_gotv(self) -> int:
         if self.gotv is None:
-            tv_port: str = valve.rcon.execute((self.server_address, self.server_port), self.RCON_password, 'tv_port')
+            tv_port: str = rcon('tv_port', self.server_address, self.server_port, self.RCON_password)
             self.logger.debug(tv_port)
             try:
                 self.gotv = tv_port[CSGOServer.findNthOccur(tv_port, '"', 3) + 1:CSGOServer.findNthOccur(tv_port, '"', 4)]
