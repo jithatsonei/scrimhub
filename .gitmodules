@@ -4,3 +4,6 @@
 [submodule "sourcemod_plugins/get5_eventapi"]
 	path = sourcemod_plugins/get5_eventapi
 	url = https://github.com/yannickgloster/get5_eventapi.git
+[submodule "cs2_plugins/MatchZy"]
+	path = cs2_plugins/MatchZy
+	url = https://github.com/shobhit-pathak/MatchZy
